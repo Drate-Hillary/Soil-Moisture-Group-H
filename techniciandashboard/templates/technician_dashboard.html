@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technician Dashboard - Soil Moisture System</title>
+    {% load static %}
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'CSS/technician.css' %}">
+</head>
+
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span class="border rounded-circle d-flex align-items-center justify-content-center w-100 h-100 mb-2">
+                
+            </span>
+            <h5 class="fw-semibold">{{user.username}}</h5>
+            <small class="fs-7" style="color: #aeaeae;">Technician</small>
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link active d-flex align-items-center gap-3" href="#dashboard">
+                    <i class="bi bi-house-door fs-4"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link d-flex align-items-center gap-3" href="#records">
+                    <i class="bi bi-journal-text fs-4"></i>
+                    Soil Moisture Records
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link d-flex align-items-center gap-3" href="#predictions">
+                    <i class="bi bi-robot fs-4"></i>
+                    Predictions
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link d-flex align-items-center gap-3" href="#reports">
+                    <i class="bi bi-file-earmark-text fs-4"></i>
+                    Reports
+                </a>
+            </li>
+
+            <li class="nav-item mt-4 px-3"> 
+                <a href="{% url 'logout' %}" class="btn btn-outline-danger d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-box-arrow-right fs-5"></i>
+                    <span class="fw-semibold">Logout</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <header class="dashboard-header d-flex justify-content-between align-items-center px-3 py-4">
+            <button class="btn btn-primary d-lg-none" id="sidebarToggle">☰</button>
+            <h2 class="m-0">AquaSoil Management</h2>
+            
+            <div class="position-relative">
+                <span class="border rounded-circle d-flex align-items-center justify-content-center cursor-pointer" 
+                      style="width: 40px; height: 40px;" 
+                      id="userDropdownTrigger"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false">
+                    <i class="bi bi-person fs-4"></i>
+                </span>
+            
+                <!-- Dropdown Menu with Dark Background -->
+                <div class="dropdown-backdrop"></div>
+
+                <ul class="dropdown-menu dropdown-menu-end shadow user-dropdown" aria-labelledby="userDropdownTrigger">
+                    <li class="dropdown-header user-profile">
+                        <div class="user-image-container">
+                            <div class="profile-image-container mb-3">
+                            {% if user.profile.image %}
+                                <img src="{{ user.profile.image.url }}" id="profileImagePreview" class="img-thumbnail" alt="Profile Image">
+                            {% else %}
+                                <div id="profileImagePreview" class="default-profile-image">
+                                    <i class="bi bi-person-circle fs-1"></i>
+                                </div>
+                            {% endif %}
+                        </div>
+                        </div>
+                        <div class="user-info">
+                            <span class="fw-bold">{{ user.username }}</span>
+                            <small class="text-muted">{{ user.email }}</small>
+                        </div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2" href="#" data-bs-toggle="modal" data-bs-target="#editUserModal">
+                            <i class="bi bi-pencil-square"></i> Edit Profile
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2" href="{% url 'logout' %}">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            
+        </header>
+
+        <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editUserModalLabel">Edit Profile</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="POST" action="{% url 'edit_profile' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <div class="mb-3">
+                                        <div class="profile-image-container mb-3">
+                                            {% if user.profile.image %}
+                                                <img src="{{ user.profile.image.url }}" id="profileImagePreview" class="img-thumbnail" alt="Profile Image">
+                                            {% else %}
+                                                <div id="profileImagePreview" class="default-profile-image">
+                                                    <i class="bi bi-person-circle fs-1"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="d-grid gap-2">
+                                            <input type="file" class="form-control d-none" id="imageUpload" name="image" accept="image/*">
+                                            <label for="imageUpload" class="btn btn-outline-primary">
+                                                <i class="bi bi-upload me-2"></i>Upload Image
+                                            </label>
+                                            {% if user.profile.image %}
+                                            <button type="button" id="removeImage" class="btn btn-outline-danger">
+                                                <i class="bi bi-trash me-2"></i>Remove
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-8">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="username" class="form-label">Username</label>
+                                            <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="email" class="form-label">Email</label>
+                                            <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                                        </div>
+                                    </div>
+                                
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="location" class="form-label">Location</label>
+                                            <select class="form-select" id="location" name="location">
+                                                {% for loc in locations %}
+                                                <option value="{{ loc }}" {% if loc == user.profile.location %}selected{% endif %}>{{ loc }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+
+        <!-- Messages -->
+        {% if messages %}
+        <div class="container mt-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Real-Time Dashboard -->
+        <section id="dashboard" class="content-section mt-3">
+            <h3>Dashboard</h3>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="d-flex align-items-center justify-content-between">
+                                Average Moisture
+                                <i class="bi bi-moisture fs-4"></i>
+                            </h5>
+                            <p>{{ average_moisture|default:"N/A" }}%</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="d-flex align-items-center justify-content-between">
+                                Average Temperature
+                                <i class="bi bi-thermometer-half fs-4"></i>
+                            </h5>
+                            <p>{{ average_temperature|default:"N/A" }}°C</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-12 mt-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Moisture Trends ({{ selected_location|default:"All Locations" }})</h5>
+                            <canvas id="moistureChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Soil Moisture Records -->
+        <section id="records" class="content-section">
+            <h3>Soil Moisture Records</h3>
+            <div class="card">
+                <div class="card-body">
+                    <h5>Storage Metrics</h5>
+                    <p>Records: {{ total_records|default:"N/A" }} | Last Update: {{ last_update|default:"N/A" }}</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <h5>Filter Records</h5>
+                    <form method="GET" action="{% url 'technician_dashboard' %}" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="location" class="form-label">Location</label>
+                            <select class="form-select" id="location" name="location">
+                                <option value="">All Assigned Locations</option>
+                                {% for location in locations %}
+                                <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
+                                    {{ location }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date"
+                                value="{{ start_date }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="end_date" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date"
+                                value="{{ end_date }}">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary d-flex align-items-center gap-2 mt-4 w-100">
+                                <i class="bi bi-search"></i>
+                                Filter
+                            </button>
+                        </div>
+                    </form>
+                    <table class="table table-striped mt-3">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Location</th>
+                                <th>Moisture</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in records %}
+                            <tr>
+                                <td>{{ record.timestamp|date:"Y-m-d H:i" }}</td>
+                                <td>{{ record.location }}</td>
+                                <td>{{ record.soil_moisture_percent }}%</td>
+                                <td>{{ record.status }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4">No records found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% if total_records > 10 and not show_all %}
+                    <div class="text-center mt-3">
+                        <a href="{% url 'technician_dashboard' %}?{% if selected_location %}location={{ selected_location }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}show_all=true"
+                            class="btn btn-outline" id="show-more-btn">
+                            <img src="{% static 'images/arrow-down.svg' %}" alt="">
+                            Show More
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if show_all %}
+                    <div class="text-center mt-3">
+                        <a href="{% url 'technician_dashboard' %}?{% if selected_location %}location={{ selected_location }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}show_all=false"
+                            class="btn btn-primary-secondary" id="show-less-btn">
+                            <img src="{% static 'images/arrow-up.svg' %}" alt="">
+                            Show Less
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <!-- Predictions -->
+        <div class="container mt-4">
+            <h2>Soil Moisture Predictions for {{ weather_location|default:"No Location" }}</h2>
+
+            <div class="card mb-4">
+                <div class="card-header d-flex align-items-center">
+                    <h5>Current Conditions</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{% url 'technician_predict_moisture_view' %}">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="current_moisture"><strong>Current Moisture (%)</strong></label>
+                                    <input type="number" class="form-control" id="current_moisture"
+                                        name="soil_moisture_percent" step="0.01"
+                                        value="{{ current_moisture|default_if_none:'' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="temperature"><strong>Temperature (°C)</strong></label>
+                                    <input type="number" class="form-control" id="temperature" name="temperature"
+                                        step="0.01" value="{{ temperature|default_if_none:'' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="humidity"><strong>Humidity (%)</strong></label>
+                                    <input type="number" class="form-control" id="humidity" name="humidity" step="0.01"
+                                        value="{{ humidity|default_if_none:'' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary d-flex align-items-center gap-2 w-100">
+                                    <i class="bi bi-robot fs-5"></i>
+                                    Predict</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5>7-Day Forecast</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="soilMoistureChart" height="400px"></canvas>
+                    {% if chart_data_json %}
+                    <script id="forecastChartData" type="application/json">
+                        {{ chart_data_json|safe }}
+                    </script>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports -->
+        <section id="reports" class="content-section">
+            <h3>Reports</h3>
+            <div class="card">
+                <div class="card-body">
+                    <h5>Generate Report</h5>
+                    <form method="POST" action="{% url 'generate_report' %}" class="row g-3">
+                        {% csrf_token %}
+                        <div class="col-md-3">
+                            <label for="report_type" class="form-label">Report Type</label>
+                            <select class="form-select" name="report_type" id="report_type">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="format_type" class="form-label">Format</label>
+                            <select class="form-select" name="format_type" id="format_type">
+                                <option value="pdf">PDF</option>
+                                <option value="excel">Excel</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" name="start_date" id="start_date">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="end_date" class="form-label">End Date</label>
+                            <input type="date" class="form-control" name="end_date" id="end_date">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary d-flex align-items-center gap-3">
+                                <i class="bi bi-download"></i> Download
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        
+    <!-- Bootstrap JS and Custom JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'JS/technician_scripts.js' %}"></script>
+    <script id="chartData" type="application/json">
+        {{ chart_data|safe }}
+        </script>
+        <script>
+        let chart = null;
+        
+        function createChart(chartData) {
+            const ctx = document.getElementById('soilMoistureChart').getContext('2d');
+        
+            // Destroy existing chart if it exists
+            if (chart) {
+                chart.destroy();
+            }
+        
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '7-Day Soil Moisture Forecast'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Moisture & Humidity (%)'
+                            },
+                            min: 0,
+                            max: 100
+                        },
+                        y2: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            });
+        }
+    
+        // Initialize trends chart
+        function createTrendsChart(chartData) {
+            const ctx = document.getElementById('moistureChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Average Moisture (%)',
+                        data: chartData.data,
+                        borderColor: '#1E90FF',
+                        backgroundColor: 'rgba(30, 144, 255, 0.2)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Moisture Trends'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Moisture (%)'
+                            },
+                            min: 0,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+    
+        // Initialize charts on page load
+        window.addEventListener('load', function () {
+            // Initialize forecast chart if data exists
+            const forecastDataElement = document.getElementById('forecastChartData');
+            if (forecastDataElement) {
+                const chartData = JSON.parse(forecastDataElement.textContent);
+                createChart(chartData);
+            }
+        
+            // Initialize trends chart
+            const trendsDataElement = document.getElementById('trendsChartData');
+            if (trendsDataElement) {
+                const chartData = JSON.parse(trendsDataElement.textContent);
+                createTrendsChart(chartData);
+            }
+        });
+    
+    </script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const imageUpload = document.getElementById('imageUpload');
+        const profileImagePreview = document.getElementById('profileImagePreview');
+        const removeImageBtn = document.getElementById('removeImage');
+
+        if (imageUpload) {
+            imageUpload.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        if (profileImagePreview.tagName === 'DIV') {
+                            const img = document.createElement('img');
+                            img.src = event.target.result;
+                            img.className = 'img-thumbnail';
+                            img.id = 'profileImagePreview';
+                            img.alt = 'Profile Image';
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            img.style.objectFit = 'cover';
+
+                            const container = profileImagePreview.parentElement;
+                            container.removeChild(profileImagePreview);
+                            container.appendChild(img);
+
+                            if (removeImageBtn) removeImageBtn.style.display = 'block';
+                        } else {
+                            profileImagePreview.src = event.target.result;
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        if (removeImageBtn) {
+            removeImageBtn.addEventListener('click', function() {
+                if (imageUpload) imageUpload.value = '';
+
+                const container = document.querySelector('.profile-image-container');
+                container.innerHTML = `
+                    <div id="profileImagePreview" class="default-profile-image">
+                        <i class="bi bi-person-circle fs-1"></i>
+                    </div>
+                `;
+                
+                this.style.display = 'none';
+            });
+        }
+    });
+    </script>
+</body>
+
+</html>

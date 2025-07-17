@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmer Dashboard - Soil Moisture System</title>
+    {% load static %}
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'CSS/farmer.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+</head>
+
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h4>Farmer Dashboard</h4>
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link active" href="#dashboard">
+                    <i class="bi bi-house-door"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#register-farm">
+                    <i class="bi bi-pencil-square"></i>
+                    Register Farm
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#soil-status">
+                    <i class="bi bi-info-lg"></i>
+                    Soil Status
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'logout' %}" class="btn btn-outline-danger ms-auto d-flex align-items-center gap-3">
+                    <i class="bi bi-box-arrow-right"></i>
+                    Logout
+                </a>
+            </li>
+        </ul>
+    </div>
+
+     <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer">
+        {% if messages %}
+        {% for message in messages %}
+        <div class="notification-card {{ message.tags }} show">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+       <header class="dashboard-header d-flex justify-content-between align-items-center px-3 py-3">
+            <button class="btn btn-primary d-lg-none" id="sidebarToggle">
+                <i class="bi bi-list"></i>
+            </button>
+            <h2 class="m-0">AquaSoil</h2>
+            <div class="position-relative">
+                <span class="border rounded-circle d-flex align-items-center justify-content-center cursor-pointer" 
+                      style="width: 40px; height: 40px;" 
+                      id="userDropdownTrigger"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false">
+                    <i class="bi bi-person fs-4"></i>
+                </span>
+            
+                <!-- Dropdown Menu with Dark Background -->
+                <div class="dropdown-backdrop"></div>
+
+                <ul class="dropdown-menu dropdown-menu-end shadow user-dropdown" aria-labelledby="userDropdownTrigger">
+                    <li class="dropdown-header user-profile">
+                        <div class="user-image-container">
+                            <div class="profile-image-container mb-3">
+                            {% if user.profile.image %}
+                                <img src="{{ user.profile.image.url }}" id="profileImagePreview" class="img-thumbnail" alt="Profile Image">
+                            {% else %}
+                                <div id="profileImagePreview" class="default-profile-image">
+                                    <i class="bi bi-person-circle fs-1"></i>
+                                </div>
+                            {% endif %}
+                        </div>
+                        </div>
+                        <div class="user-info">
+                            <span class="fw-bold">{{ user.username }}</span>
+                            <small class="text-muted">{{ user.email }}</small>
+                        </div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2" href="#" data-bs-toggle="modal" data-bs-target="#editUserModal">
+                            <i class="bi bi-pencil-square"></i> Edit Profile
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2" href="{% url 'logout' %}">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </header>
+
+        <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editUserModalLabel">Edit Profile</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="POST" action="{% url 'edit_profile' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <div class="mb-3">
+                                        <div class="profile-image-container mb-3">
+                                            {% if user.profile.image %}
+                                                <img src="{{ user.profile.image.url }}" id="profileImagePreview" class="img-thumbnail" alt="Profile Image">
+                                            {% else %}
+                                                <div id="profileImagePreview" class="default-profile-image">
+                                                    <i class="bi bi-person-circle fs-1"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="d-grid gap-2">
+                                            <input type="file" class="form-control d-none" id="imageUpload" name="image" accept="image/*">
+                                            <label for="imageUpload" class="btn btn-outline-primary">
+                                                <i class="bi bi-upload me-2"></i>Upload Image
+                                            </label>
+                                            {% if user.profile.image %}
+                                            <button type="button" id="removeImage" class="btn btn-outline-danger">
+                                                <i class="bi bi-trash me-2"></i>Remove
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-8">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="username" class="form-label">Username</label>
+                                            <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="email" class="form-label">Email</label>
+                                            <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                                        </div>
+                                    </div>
+                                
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="location" class="form-label">Location</label>
+                                            <select class="form-select" id="location" name="location">
+                                                {% for loc in locations %}
+                                                <option value="{{ loc }}" {% if loc == user.profile.location %}selected{% endif %}>{{ loc }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="content-section">
+            <h3>Overview</h3>
+            <div class="row">
+                <div class="col-md-4 col-sm6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="d-flex align-items-center justify-content-between">
+                                Current Temperature 
+                                <i class="bi bi-thermometer-half"></i>
+                            </h5>
+                            <p class="status-text">{{ current_weather.temperature }}°C</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-sm-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="d-flex align-items-center justify-content-between">
+                                Current Humidity(%) 
+                                <i class="bi bi-droplet"></i>
+                            </h5>
+                            <p class="status-text">{{ current_weather.humidity }}%</p>
+                        </div>
+                    </div>
+                </div>
+
+                 <!-- Location Selector -->
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <h5>Soil Moisture, Temperature, Humidity Trends</h5>
+                                </div>
+                                <div class="col-md-6">
+                                    <form method="GET" action="{% url 'farmer_dashboard' %}">
+                                        <select id="locationSelect" name="location" class="form-select w-100" onchange="this.form.submit()">
+                                            <option value="">Select Location</option>
+                                            {% for location in locations %}
+                                                <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>{{ location }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </form>
+                                </div>
+                            </div>
+                            <canvas id="moistureChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Soil Status Prediction Section -->
+        <section id="soil-status" class="content-section">
+            <h3>Soil Status Prediction</h3>
+            {% if messages %}
+            <div class="alert-container">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="card">
+                <div class="card-body">
+                    <form id="soil-status-form" method="POST">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="soil-moisture" class="form-label">Soil Moisture (%)</label>
+                                    <input type="number" class="form-control" id="soil-moisture" name="soil-moisture"
+                                        placeholder="Enter moisture percentage" min="0" max="100" step="0.1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="temperature" class="form-label">Temperature (°C)</label>
+                                    <input type="number" class="form-control" id="temperature" name="temperature"
+                                        placeholder="Enter temperature" step="0.1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="humidity" class="form-label">Humidity (%)</label>
+                                    <input type="number" class="form-control" id="humidity" name="humidity"
+                                        placeholder="Enter humidity percentage" min="0" max="100" step="0.1" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary btn-lg w-100">Get Soil Status</button>
+                        </div>
+                    </form>
+
+                    {% if prediction %}
+                    <div id="status-result" class="mt-4">
+                        <h5>Soil Status Analysis</h5>
+                        <div class="alert alert-info" id="status-alert">
+                            <h4 id="status-text">{{ prediction.status }}</h4>
+                            <div id="status-description">
+                                <strong>Input Values</strong>
+                                Soil Moisture: {{ prediction.input_values.soil_moisture }}%,
+                                Temperature: {{ prediction.input_values.temperature }}°C
+                                Humidity: {{ prediction.input_values.humidity }}%
+                            </div>
+                        </div>
+
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5>Irrigation Recommendation</h5>
+                                <p id="irrigation-recommendation">{{ prediction.irrigation_recommendation }}</p>
+                                <div id="schedule-details" class="mt-3">
+                                    <ul>
+                                        <li><strong>Urgency:</strong> {{ prediction.schedule.urgency }}</li>
+                                        <li><strong>Frequency:</strong> {{ prediction.schedule.frequency }}</li>
+                                        <li><strong>Duration:</strong> {{ prediction.schedule.duration }}</li>
+                                        <li><strong>Water Amount:</strong> {{ prediction.schedule.water_amount }}</li>
+                                        <li><strong>Monitoring:</strong> {{ prediction.schedule.monitoring }}</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div id="status-result" class="mt-4" style="display: none;">
+                        <h5>Soil Status Analysis</h5>
+                        <div class="alert" id="status-alert">
+                            <h4 id="status-text"></h4>
+                            <p id="status-description"></p>
+                        </div>
+
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5>Irrigation Recommendation</h5>
+                                <p id="irrigation-recommendation"></p>
+                                <div id="schedule-details" class="mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section id="register-farm" class="content-section">
+            <h3>Register New Farm</h3>
+            <div class="card">
+                <div class="card-body">
+                    <form id="farm-registration-form" method="POST" action="#">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="farm-name" class="form-label">Farm Location</label>
+                                    <select class="form-select" id="farm-name" name="farm_name" required>
+                                        <option value="">Select Location</option>
+                                        {% for location in locations %}
+                                        <option value="{{ location }}">{{ location }}</option>
+                                        {% endfor %}
+                                        <option value="other">Other (specify below)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="farm-size" class="form-label">Farm Size (acres)</label>
+                                    <input type="number" class="form-control" id="farm-size" name="farm_size" step="0.1" required>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="row" id="other-farm-container" style="display: none;">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="other-farm-name" class="form-label">Specify Farm Location</label>
+                                    <input type="text" class="form-control" id="other-farm-name" name="other_farm_name">
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="farm-description" class="form-label">Farm Description</label>
+                                    <textarea class="form-control" id="farm-description" name="farm_description" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">Register Farm</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Add this to display registered farms -->
+        {% if farms %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4>Your Registered Farms</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Location</th>
+                                <th>Size (acres)</th>
+                                <th>Description</th>
+                                <th>Registered On</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for farm in farms %}
+                            <tr>
+                                <td>{{ farm.location }}</td>
+                                <td>{{ farm.size }}</td>
+                                <td>{{ farm.description|default:"-" }}</td>
+                                <td>{{ farm.created_at|date:"Y-m-d" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Bootstrap JS and Custom JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'JS/farmer_scripts.js' %}"></script>
+    <!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Parse chart data from Django context
+    const chartData = JSON.parse('{{ chart_data | safe }}');
+
+    // Initialize Chart.js
+    const ctx = document.getElementById('moistureChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Moisture / Humidity (%)'
+                    },
+                    min: 0,
+                    max: 100
+                },
+                y2: {
+                    type: 'linear',
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Temperature (°C)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'Soil Moisture, Temperature, and Humidity Trends for {{ selected_location }}'
+                }
+            }
+        }
+    });
+</script>
+
+</body>
+
+</html>

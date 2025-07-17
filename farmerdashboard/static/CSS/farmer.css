@@ -1,0 +1,238 @@
+/* Global Styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 250px;
+    background-color: #fff;
+    color: black;
+    position: fixed;
+    height: 100%;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+}
+
+.sidebar-header {
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid #219653;
+    border-radius: 4px;
+}
+
+.nav-link {
+    color: white;
+    padding: 15px 20px;
+    display: block;
+    text-decoration: none;
+    font-size: 1.1rem;
+}
+.nav-link a{
+    color: inherit;
+    text-decoration: none;
+}
+
+.nav-link:hover, .nav-link.active {
+    background-color: #219653;
+    color: white;
+}
+
+/* Main Content */
+.main-content {
+    margin-left: 250px;
+    padding: 20px;
+    flex-grow: 1;
+    background-color: #f4f6f9;
+}
+
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.dashboard-header img{
+    height: 50px;
+    width: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    aspect-ratio: 1/1;
+}
+
+.content-section {
+    margin-top: 20px;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.card-body {
+    padding: 20px;
+}
+
+/* Visual Cues */
+.status-text {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.text-danger {
+    font-weight: bold;
+}
+
+.recommendation-text {
+    font-size: 1.1rem;
+    color: #27ae60;
+    margin-bottom: 10px;
+}
+
+/* Buttons */
+.btn-lg {
+    font-size: 1.2rem;
+    padding: 10px 20px;
+}
+
+/* Responsive Design */
+@media (max-width: 992px) {
+    .sidebar {
+        transform: translateX(-250px);
+    }
+
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    #sidebarToggle {
+        display: block;
+    }
+}
+
+@media (max-width: 576px) {
+    .card-body {
+        padding: 15px;
+    }
+
+    .content-section h3 {
+        font-size: 1.5rem;
+    }
+
+    .table {
+        font-size: 0.9rem;
+    }
+
+    .list-group-item {
+        font-size: 0.9rem;
+    }
+
+    .btn-lg {
+        width: 100%;
+    }
+}
+
+/* Chart Styling */
+canvas {
+    max-height: 250px;
+}
+
+/* Soil Status Section Styles */
+#status-result {
+    transition: all 0.3s ease;
+}
+
+#status-alert {
+    border-left: 5px solid;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+/* Different status colors */
+.status-critical-low {
+    border-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.status-dry {
+    border-color: #fd7e14;
+    background-color: rgba(253, 126, 20, 0.1);
+}
+
+.status-normal {
+    border-color: #28a745;
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+.status-wet {
+    border-color: #17a2b8;
+    background-color: rgba(23, 162, 184, 0.1);
+}
+
+.status-critical-high {
+    border-color: #6f42c1;
+    background-color: rgba(111, 66, 193, 0.1);
+}
+
+
+/* Notification Container */
+.notification-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  width: 400px;
+}
+
+/* Notification Card */
+.notification-card {
+  font-size: 0.85rem;
+  font-weight: 500;
+  background-color: white;
+  border-radius: 5px;
+  padding: 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transform: translateX(100%);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+/* Slide-in Animation */
+.notification-card.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Success Message Styling */
+.notification-card.success {
+  border: 1px solid #28a745;
+}
+
+/* Error Message Styling */
+.notification-card.error {
+  border: 1px solid #dc3545;
+}
+
+/* Warning Message Styling (optional, for completeness) */
+.notification-card.warning {
+  border: 2px solid #ffc107;
+}
+
+/* Info Message Styling (optional) */
+.notification-card.info {
+  border: 2px solid #17a2b8;
+}

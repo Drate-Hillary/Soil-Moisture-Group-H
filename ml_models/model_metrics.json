@@ -1,0 +1,92 @@
+{
+    "accuracy": 98.0,
+    "precision": 98.06,
+    "recall": 98.0,
+    "f1_score": 98.01,
+    "training_samples": 397,
+    "test_samples": 100,
+    "total_samples": 497,
+    "selected_features_count": 25,
+    "class_distribution": {
+        "Critical Low": 37,
+        "Dry": 161,
+        "Normal": 227,
+        "Wet": 72
+    },
+    "confusion_matrix": [
+        [
+            7,
+            0,
+            0,
+            0
+        ],
+        [
+            0,
+            31,
+            1,
+            0
+        ],
+        [
+            0,
+            0,
+            45,
+            1
+        ],
+        [
+            0,
+            0,
+            0,
+            15
+        ]
+    ],
+    "selected_features": [
+        "soil_moisture_percent",
+        "temperature_celsius",
+        "humidity_percent",
+        "hour_cos",
+        "moisture_lag_2",
+        "temp_lag_1",
+        "moisture_rolling_3",
+        "humidity_rolling_3",
+        "humidity_rolling_6",
+        "moisture_change",
+        "moisture_change_2",
+        "temp_change_2",
+        "humidity_change",
+        "humidity_change_2",
+        "temp_humidity_interaction",
+        "moisture_temp_ratio",
+        "moisture_humidity_ratio",
+        "temp_humidity_ratio",
+        "moisture_squared",
+        "temp_squared",
+        "humidity_squared",
+        "dryness_index",
+        "moisture_deficit",
+        "humidity_stress_index",
+        "moisture_stability"
+    ],
+    "model_type": "VotingClassifier (RF + GB + ET)",
+    "class_wise_performance": {
+        "Critical Low": {
+            "precision": 100.0,
+            "recall": 100.0,
+            "f1_score": 100.0
+        },
+        "Dry": {
+            "precision": 100.0,
+            "recall": 96.88,
+            "f1_score": 98.41
+        },
+        "Normal": {
+            "precision": 97.83,
+            "recall": 97.83,
+            "f1_score": 97.83
+        },
+        "Wet": {
+            "precision": 93.75,
+            "recall": 100.0,
+            "f1_score": 96.77
+        }
+    }
+}
