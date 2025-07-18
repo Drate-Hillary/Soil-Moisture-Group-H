@@ -254,3 +254,24 @@ def farmer_dashboard(request):
     })
 
     return render(request, 'farmer_dashboard.html', context)
+
+@login_required
+@role_required('farmer')
+def delete_farm(request, farm_id):
+    try:
+        farm = Farm.objects.get(id=farm_id)
+        
+        if farm.farmer != request.user:
+            messages.error(request, "You don't have permission to delete this farm.")
+            return redirect('farmer_dashboard')
+        
+        location = farm.location
+        farm.delete()
+        messages.success(request, f"Farm at {location} has been successfully deleted.")
+        
+    except Farm.DoesNotExist:
+        messages.error(request, "The farm you tried to delete doesn't exist.")
+    except Exception as e:
+        messages.error(request, f"Error deleting farm: {str(e)}")
+    
+    return redirect('farmer_dashboard')

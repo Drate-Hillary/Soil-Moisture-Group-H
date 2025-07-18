@@ -103,11 +103,11 @@ def edit_profile(request):
         # Validation checks
         if CustomUser.objects.filter(username=username).exclude(pk=user.pk).exists():
             messages.error(request, 'Username already taken')
-            return redirect('technician_dashboard')
+            return redirect(user.role + '_dashboard')  # Dynamic redirect based on role
             
         if CustomUser.objects.filter(email=email).exclude(pk=user.pk).exists():
             messages.error(request, 'Email already in use')
-            return redirect('technician_dashboard')
+            return redirect(user.role + '_dashboard')  # Dynamic redirect based on role
             
         user.username = username
         user.email = email
@@ -130,6 +130,6 @@ def edit_profile(request):
         profile.save()
         
         messages.success(request, 'Profile updated successfully!')
-        return redirect('technician_dashboard')
+        return redirect(user.role + '_dashboard')  # Dynamic redirect based on role
     
-    return redirect('technician_dashboard')
+    return redirect(request.user.role + '_dashboard')

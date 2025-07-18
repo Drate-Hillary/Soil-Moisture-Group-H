@@ -252,7 +252,7 @@ def get_locations(technician=None):
                                             
                                                                                       
                                             
-from ml_model.soil_moisture_prediction import SoilMoisturePredictor
+from ml_model.soil_moisture_prediction import load_model, train_model_with_db_data, predict_future_moisture
 from admindashboard.models import SoilMoistureRecord
 from django.utils import timezone
 
@@ -264,14 +264,11 @@ def technician_predict_moisture_view(request):
     """
     
     try:
-        
-        classifier = SoilMoisturePredictor()
-
         # If model isn't loaded, try to train it with default data
-        model_loaded = classifier.load_model()
+        model_loaded = load_model()
         if not model_loaded:
             try:
-                training_result = classifier.train_model_with_db_data()
+                training_result = train_model_with_db_data()
                 if not training_result:
                     messages.error(request, "Model training failed. Please check the logs.")
                 messages.info(request, "Model trained successfully with historical data")
@@ -315,7 +312,7 @@ def technician_predict_moisture_view(request):
                     return redirect('technician_predict_moisture_view')
 
                 # Get 7-day forecast
-                forecast = classifier.predict_future_moisture(
+                forecast = predict_future_moisture(
                     location=location,
                     current_moisture=current_moisture,
                     temperature=temperature,

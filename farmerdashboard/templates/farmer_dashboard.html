@@ -19,7 +19,11 @@
     <!-- Sidebar Navigation -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <h4>Farmer Dashboard</h4>
+            <span class="border rounded-circle d-flex align-items-center justify-content-center w-100 h-100 mb-2">
+                
+            </span>
+            <h5 class="fw-semibold" style="color: white;">{{user.username}}</h5>
+            <small class="fs-7" style="color: #aeaeae;">Farmer</small>
         </div>
         <ul class="nav flex-column">
             <li class="nav-item">
@@ -40,16 +44,16 @@
                     Soil Status
                 </a>
             </li>
-            <li class="nav-item">
-                <a href="{% url 'logout' %}" class="btn btn-outline-danger ms-auto d-flex align-items-center gap-3">
-                    <i class="bi bi-box-arrow-right"></i>
-                    Logout
+            <li class="nav-item mt-4 px-3"> 
+                <a href="{% url 'logout' %}" class="btn btn-outline-danger d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-box-arrow-right fs-5"></i>
+                    <span class="fw-semibold">Logout</span>
                 </a>
             </li>
         </ul>
     </div>
 
-     <!-- Notification Container -->
+    <!-- Notification Container -->
     <div class="notification-container" id="notificationContainer">
         {% if messages %}
         {% for message in messages %}
@@ -275,7 +279,7 @@
                         </div>
 
                         <div class="col-md-6 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary btn-lg w-100">Get Soil Status</button>
+                            <button type="submit" class="btn btn-primary">Get Soil Status</button>
                         </div>
                     </form>
 
@@ -397,6 +401,7 @@
                                 <th>Size (acres)</th>
                                 <th>Description</th>
                                 <th>Registered On</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -406,6 +411,14 @@
                                 <td>{{ farm.size }}</td>
                                 <td>{{ farm.description|default:"-" }}</td>
                                 <td>{{ farm.created_at|date:"Y-m-d" }}</td>
+                                <td>
+                                    <form method="post" action="{% url 'delete_farm' farm.id %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this farm?');">
+                                            <i class="bi bi-trash3 me-1"></i> Delete
+                                        </button>
+                                    </form>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -421,61 +434,132 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'JS/farmer_scripts.js' %}"></script>
     <!-- Include Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    // Parse chart data from Django context
-    const chartData = JSON.parse('{{ chart_data | safe }}');
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Parse chart data from Django context
+        const chartData = JSON.parse('{{ chart_data | safe }}');
 
-    // Initialize Chart.js
-    const ctx = document.getElementById('moistureChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: chartData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Date'
+        // Initialize Chart.js
+        const ctx = document.getElementById('moistureChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Moisture / Humidity (%)'
+                        },
+                        min: 0,
+                        max: 100
+                    },
+                    y2: {
+                        type: 'linear',
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
                     }
                 },
-                y1: {
-                    type: 'linear',
-                    position: 'left',
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
                     title: {
                         display: true,
-                        text: 'Moisture / Humidity (%)'
-                    },
-                    min: 0,
-                    max: 100
-                },
-                y2: {
-                    type: 'linear',
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Temperature (°C)'
-                    },
-                    grid: {
-                        drawOnChartArea: false
+                        text: 'Soil Moisture, Temperature, and Humidity Trends for {{ selected_location }}'
                     }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top'
-                },
-                title: {
-                    display: true,
-                    text: 'Soil Moisture, Temperature, and Humidity Trends for {{ selected_location }}'
                 }
             }
-        }
-    });
-</script>
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const imageUpload = document.getElementById('imageUpload');
+            const profileImagePreview = document.getElementById('profileImagePreview');
+            const removeImageBtn = document.getElementById('removeImage');
+
+            if (imageUpload) {
+                imageUpload.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            if (profileImagePreview.tagName === 'DIV') {
+                                const img = document.createElement('img');
+                                img.src = event.target.result;
+                                img.className = 'img-thumbnail';
+                                img.id = 'profileImagePreview';
+                                img.alt = 'Profile Image';
+                                img.style.width = '100%';
+                                img.style.height = '100%';
+                                img.style.objectFit = 'cover';
+
+                                const container = profileImagePreview.parentElement;
+                                container.removeChild(profileImagePreview);
+                                container.appendChild(img);
+
+                                if (removeImageBtn) removeImageBtn.style.display = 'block';
+                            } else {
+                                profileImagePreview.src = event.target.result;
+                            }
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+
+            if (removeImageBtn) {
+                removeImageBtn.addEventListener('click', function() {
+                    if (imageUpload) imageUpload.value = '';
+
+                    const container = document.querySelector('.profile-image-container');
+                    container.innerHTML = `
+                        <div id="profileImagePreview" class="default-profile-image">
+                            <i class="bi bi-person-circle fs-1"></i>
+                        </div>
+                    `;
+                    
+                    this.style.display = 'none';
+                });
+            }
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const notifications = document.querySelectorAll('.notification-card');
+            notifications.forEach((notification, index) => {
+                setTimeout(() => {
+                    notification.classList.add('show');
+                }, index * 200);
+
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 500);
+                }, 5000);
+            });
+        });
+    </script>
 
 </body>
 
