@@ -568,3 +568,38 @@ def generate_excel_report(request, report_type, moisture_records, prediction_rec
     response.write(buffer.getvalue())
     buffer.close()
     return response
+
+
+# views.py
+from django.contrib import messages
+from django.shortcuts import redirect
+from farmerdashboard.models import Farm
+
+def send_farmer_notification(request):
+    if request.method == 'POST':
+        farmer_id = request.POST.get('farmer_id')
+        notification_type = request.POST.get('notification_type')
+        message = request.POST.get('message')
+        urgency = request.POST.get('urgency')
+        
+        try:
+            farm = Farm.objects.get(id=farmer_id)
+            farmer = farm.farmer
+            notification = Notification.objects.create(
+                technician=request.user,
+                farmer=farmer.user,
+                notification_type=notification_type,
+                message=message,
+                urgency=urgency
+            )
+            messages.success(request, 'Notification sent successfully!')
+            
+            # Here you could add code to send an email or SMS notification
+            # send_email_notification(farmer.user.email, message)
+            
+        except FarmerProfile.DoesNotExist:
+            messages.error(request, 'Farmer not found')
+            
+        return redirect('technician_dashboard')
+    
+    return redirect('technician_dashboard')

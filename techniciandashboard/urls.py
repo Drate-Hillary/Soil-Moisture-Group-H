@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 from admindashboard.views import upload_csv, predict_moisture
-from techniciandashboard.views import technician_predict_moisture_view, generate_report  
+from techniciandashboard.views import technician_predict_moisture_view, generate_report, send_farmer_notification  
 from userAuthentication.views import edit_profile
 
 urlpatterns = [
@@ -11,5 +11,6 @@ urlpatterns = [
     path('technician/predict/', technician_predict_moisture_view, name='technician_predict_moisture_view'),
     path('generate_report/', generate_report, name='generate_report'),
     path('edit_profile/', edit_profile, name='edit_profile'),
+    path('send_farmer_notification/', send_farmer_notification, name='send_farmer_notification'),
 ]
 

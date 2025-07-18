@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor, VotingRegressor
-from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.feature_selection import SelectKBest, f_regression, f_classif
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, explained_variance_score
@@ -21,10 +21,15 @@ model_path = os.path.join('models', f'soil_moisture_{model_type}.pkl')
 scaler_path = os.path.join('models', f'scaler_{model_type}.pkl')
 model = None
 scaler = None
+
+# Updated feature columns to match what's actually available after preprocessing
 feature_columns = [
     'temperature_celsius', 'humidity_percent', 'precipitation',
-    'month', 'day', 'hour', 'previous_moisture'
+    'month_sin', 'month_cos', 'hour_sin', 'hour_cos',
+    'day_of_week', 'day_of_year', 'previous_moisture',
+    'moisture_change', 'rolling_7d_avg', 'temp_humidity_interaction'
 ]
+
 selected_features = feature_columns.copy()  # Will be updated after feature selection
 moisture_categories = {
     'Very Low': (0, 20),
@@ -33,7 +38,7 @@ moisture_categories = {
     'High': (60, 80),
     'Very High': (80, 100)
 }
-k_features = min(5, len(feature_columns))
+k_features = min(8, len(feature_columns))  # Increased to accommodate more features
 
 # Create models directory
 os.makedirs(os.path.dirname(model_path), exist_ok=True)
@@ -86,10 +91,13 @@ def load_model():
             return True
         else:
             logger.warning("Model or scaler files not found")
+            from sklearn.impute import SimpleImputer
+            from sklearn.preprocessing import RobustScaler
             # Initialize new pipeline
             scaler = StandardScaler()
             model = Pipeline([
-                ('scaler', StandardScaler()),
+                ('imputer', SimpleImputer(strategy='mean')),
+                ('scaler', RobustScaler()),
                 ('selectkbest', SelectKBest(score_func=f_regression, k=k_features)),
                 ('regressor', VotingRegressor([
                     ('rf', RandomForestRegressor(
@@ -162,7 +170,22 @@ def get_historical_data_from_db(location=None, days_back=365):
     try:
         from admindashboard.models import SoilMoistureRecord
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
-        query = SoilMoistureRecord.objects.filter(timestamp__gte=cutoff_date).order_by('timestamp')
+        query = SoilMoistureRecord.objects.filter(
+            timestamp__gte=cutoff_date,
+            soil_moisture_percent__isnull=False,
+            temperature_celsius__isnull=False,
+            humidity_percent__isnull=False
+        ).order_by('timestamp')
+        
+        # Add outlier filtering
+        query = query.filter(
+            soil_moisture_percent__gte=0,
+            soil_moisture_percent__lte=100,
+            temperature_celsius__gte=-20,
+            temperature_celsius__lte=60,
+            humidity_percent__gte=0,
+            humidity_percent__lte=100
+        )
         
         if location:
             query = query.filter(location=location)
@@ -188,25 +211,65 @@ def get_historical_data_from_db(location=None, days_back=365):
         logger.error(f"Error fetching historical data: {str(e)}")
         return pd.DataFrame()
 
-def preprocess_data(df):
-    """Preprocess data for training/prediction"""
+def preprocess_data(df, is_prediction=False):
+    """Preprocess data for training or prediction, handling NaN values robustly"""
     if df.empty:
         return df
-    
+
+    # Ensure precipitation column exists
+    if 'precipitation' not in df.columns:
+        df['precipitation'] = 0.0
+
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df = df.sort_values(['location', 'timestamp'])
-    
+
+    # Create temporal features
     df['month'] = df['timestamp'].dt.month
     df['day'] = df['timestamp'].dt.day
     df['hour'] = df['timestamp'].dt.hour
-    df['previous_moisture'] = df.groupby('location')['soil_moisture_percent'].shift(1)
-    df['precipitation'] = 0
-    df['previous_moisture'] = df['previous_moisture'].fillna(df['soil_moisture_percent'])
-    df = df.dropna(subset=['soil_moisture_percent'])
-    
+    df['day_of_week'] = df['timestamp'].dt.dayofweek
+    df['day_of_year'] = df['timestamp'].dt.dayofyear
+
+    # Cyclical encoding for temporal features
+    df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12)
+    df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
+    df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
+    df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
+
+    # Handle lag and rolling features
+    if is_prediction and len(df) == 1:
+        # For single-row prediction, use provided soil_moisture_percent as previous_moisture
+        df['previous_moisture'] = df['soil_moisture_percent']
+        df['moisture_change'] = 0.0
+        df['rolling_7d_avg'] = df['soil_moisture_percent']
+    else:
+        # Lag features
+        df['previous_moisture'] = df.groupby('location')['soil_moisture_percent'].shift(1)
+        df['moisture_change'] = df.groupby('location')['soil_moisture_percent'].diff()
+        # Rolling statistics
+        df['rolling_7d_avg'] = df.groupby('location')['soil_moisture_percent'].transform(
+            lambda x: x.rolling(7, min_periods=1).mean()
+        )
+
+    # Weather interactions
+    df['temp_humidity_interaction'] = df['temperature_celsius'] * df['humidity_percent']
+
+    # Robust NaN handling
+    for col in feature_columns:
+        if col not in df.columns:
+            df[col] = 0.0
+        else:
+            df[col] = df[col].fillna(df[col].mean() if not df[col].isna().all() else 0.0)
+
+    # Drop original temporal features
+    columns_to_drop = ['month', 'day', 'hour']
+    existing_columns_to_drop = [col for col in columns_to_drop if col in df.columns]
+    if existing_columns_to_drop:
+        df = df.drop(existing_columns_to_drop, axis=1)
+
     if model_type == 'classifier':
         df['moisture_category'] = df['soil_moisture_percent'].apply(categorize_moisture)
-    
+
     return df
 
 def train_model_with_db_data(location=None, retrain=False):
@@ -218,39 +281,101 @@ def train_model_with_db_data(location=None, retrain=False):
             raise ValueError("No historical data available for training")
         
         df = preprocess_data(df)
-        if len(df) < 10:
-            raise ValueError("Insufficient data for training (minimum 10 records required)")
         
+        # Ensure we have the required features
+        missing_features = [col for col in feature_columns if col not in df.columns]
+        if missing_features:
+            logger.warning(f"Missing features: {missing_features}")
+            # Add missing features with default values
+            for col in missing_features:
+                df[col] = 0.0
+        
+        # Prepare features and target
         X = df[feature_columns]
-        
         if model_type == 'classifier':
             y = df['moisture_category']
         else:
             y = df['soil_moisture_percent']
         
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42,
-            stratify=y if model_type == 'classifier' else None
-        )
+        # Add time-based validation split
+        if len(df) > 100:  # Only if sufficient data
+            # Sort by timestamp first
+            sorted_indices = df.sort_values('timestamp').index
+            split_idx = int(0.8 * len(df))
+            train_indices = sorted_indices[:split_idx]
+            test_indices = sorted_indices[split_idx:]
+            
+            X_train, X_test = X.loc[train_indices], X.loc[test_indices]
+            y_train, y_test = y.loc[train_indices], y.loc[test_indices]
+        else:
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42,
+                stratify=y if model_type == 'classifier' else None
+            )
         
         if model is None or retrain:
             if model_type == 'regressor':
+                base_models = [
+                    ('rf', RandomForestRegressor(
+                        n_estimators=100,
+                        max_depth=8,
+                        min_samples_split=10,
+                        min_samples_leaf=4,
+                        max_features='sqrt',
+                        random_state=42,
+                        n_jobs=-1
+                    )),
+                    ('gb', GradientBoostingRegressor(
+                        n_estimators=100,
+                        max_depth=4,
+                        min_samples_split=10,
+                        min_samples_leaf=4,
+                        subsample=0.8,
+                        random_state=42
+                    )),
+                    ('et', ExtraTreesRegressor(
+                        n_estimators=100,
+                        max_depth=8,
+                        min_samples_split=10,
+                        min_samples_leaf=4,
+                        random_state=42,
+                        n_jobs=-1
+                    ))
+                ]
                 model = Pipeline([
                     ('scaler', StandardScaler()),
-                    ('selectkbest', SelectKBest(score_func=f_regression, k=k_features)),
-                    ('regressor', VotingRegressor([
-                        ('rf', RandomForestRegressor(
-                            n_estimators=200, max_depth=10, min_samples_split=5,
-                            min_samples_leaf=2, random_state=42, n_jobs=-1)),
-                        ('gb', GradientBoostingRegressor(
-                            n_estimators=200, max_depth=5, min_samples_split=5,
-                            min_samples_leaf=2, random_state=42)),
-                        ('et', ExtraTreesRegressor(
-                            n_estimators=200, max_depth=10, min_samples_split=5,
-                            min_samples_leaf=2, random_state=42, n_jobs=-1))
-                    ]))
+                    ('selectkbest', SelectKBest(score_func=f_regression, k='all')),
+                    ('regressor', VotingRegressor(
+                        estimators=base_models,
+                        weights=None,
+                        n_jobs=-1
+                    ))
                 ])
+                
+                # Add cross-validation for hyperparameter tuning
+                from sklearn.model_selection import GridSearchCV
+                param_grid = {
+                    'selectkbest__k': [min(5, len(feature_columns)), min(8, len(feature_columns)), 'all'],
+                    'regressor__weights': [
+                        None,
+                        [1, 1, 1],
+                        [2, 1, 1]
+                    ]
+                }
+                
+                grid_search = GridSearchCV(
+                    model,
+                    param_grid,
+                    cv=5,
+                    scoring='neg_mean_squared_error',
+                    n_jobs=-1
+                )
+                
+                grid_search.fit(X_train, y_train)
+                model = grid_search.best_estimator_
+                logger.info(f"Best params: {grid_search.best_params_}")
             else:
+                from sklearn.ensemble import VotingClassifier, RandomForestClassifier, GradientBoostingClassifier, ExtraTreesClassifier
                 model = Pipeline([
                     ('scaler', StandardScaler()),
                     ('selectkbest', SelectKBest(score_func=f_classif, k=k_features)),
@@ -336,10 +461,6 @@ def train_model_with_db_data(location=None, retrain=False):
             train_f1 = f1_score(y_train, y_pred_train, average='weighted', zero_division=0)
             test_f1 = f1_score(y_test, y_pred_test, average='weighted', zero_division=0)
             
-            # Detailed classification report
-            class_report = classification_report(y_test, y_pred_test, output_dict=True)
-            conf_matrix = confusion_matrix(y_test, y_pred_test)
-            
             metrics = {
                 'train_accuracy': round(train_accuracy, 4),
                 'test_accuracy': round(test_accuracy, 4),
@@ -354,8 +475,8 @@ def train_model_with_db_data(location=None, retrain=False):
                 'model_type': 'classifier',
                 'selected_features': selected_features,
                 'feature_scores': dict(zip(feature_columns, select_k_best.scores_)),
-                'classification_report': class_report,
-                'confusion_matrix': conf_matrix.tolist(),
+                'classification_report': classification_report(y_test, y_pred_test, output_dict=True),
+                'confusion_matrix': confusion_matrix(y_test, y_pred_test).tolist(),
                 'classes': list(model.named_steps['classifier'].classes_)
             }
             
@@ -377,38 +498,70 @@ def train_model_with_db_data(location=None, retrain=False):
         logger.error(f"Error training model: {str(e)}")
         raise
 
+def create_prediction_dataframe(location, temperature, humidity, current_moisture, timestamp=None, precipitation=0):
+    """Create a properly formatted dataframe for prediction"""
+    if timestamp is None:
+        timestamp = datetime.now()
+    
+    # Create basic data
+    data = {
+        'timestamp': timestamp,
+        'location': location,
+        'temperature_celsius': temperature,
+        'humidity_percent': humidity,
+        'precipitation': precipitation,
+        'soil_moisture_percent': current_moisture  # This will be used for lag features
+    }
+    
+    df = pd.DataFrame([data])
+    
+    # Apply the same preprocessing as training data
+    df = preprocess_data(df)
+    
+    # Ensure all required features are present
+    for col in feature_columns:
+        if col not in df.columns:
+            df[col] = 0.0
+    
+    return df[feature_columns]
+
 def predict_single(location, temperature, humidity, current_moisture, timestamp=None, precipitation=0, return_probabilities=False):
     """Make single prediction"""
     if not model:
         raise ValueError("Model not trained or loaded")
     
-    if timestamp is None:
-        timestamp = datetime.now()
+    # Create properly formatted input data
+    input_df = create_prediction_dataframe(
+        location, temperature, humidity, current_moisture, timestamp, precipitation
+    )
     
-    input_data = {
-        'temperature_celsius': temperature,
-        'humidity_percent': humidity,
-        'precipitation': precipitation,
-        'month': timestamp.month,
-        'day': timestamp.day,
-        'hour': timestamp.hour,
-        'previous_moisture': current_moisture
-    }
+    prediction = model.predict(input_df)[0]
     
-    input_df = pd.DataFrame([input_data])
-    for col in feature_columns:
-        if col not in input_df.columns:
-            input_df[col] = 0
-    
-    X = input_df[feature_columns]  # Pipeline will handle feature selection
-    prediction = model.predict(X)[0]
-    
-    predicted_category = categorize_moisture(prediction)
-    return {
-        'predicted_category': predicted_category,
-        'predicted_moisture_value': round(prediction, 2),
-        'confidence': 0.8  # VotingRegressor doesn't provide probabilities
-    }
+    if model_type == 'regressor':
+        predicted_category = categorize_moisture(prediction)
+        return {
+            'predicted_category': predicted_category,
+            'predicted_moisture_value': round(prediction, 2),
+            'confidence': 0.8  # VotingRegressor doesn't provide probabilities
+        }
+    else:
+        # For classifier
+        if return_probabilities and hasattr(model, 'predict_proba'):
+            proba = model.predict_proba(input_df)[0]
+            classes = model.classes_
+            probabilities = dict(zip(classes, proba))
+            return {
+                'predicted_category': prediction,
+                'predicted_moisture_value': round(get_category_midpoint(prediction), 2),
+                'confidence': round(max(proba), 3),
+                'probabilities': probabilities
+            }
+        else:
+            return {
+                'predicted_category': prediction,
+                'predicted_moisture_value': round(get_category_midpoint(prediction), 2),
+                'confidence': 0.8
+            }
 
 def get_weather_forecast(location="Kampala", days=7):
     """Fetch weather forecast from API"""
@@ -494,7 +647,54 @@ def get_feature_importance():
     if not model:
         return None
     
-    importances = model.feature_importances_
-    feature_importance = dict(zip(feature_columns, importances))
-    sorted_importance = dict(sorted(feature_importance.items(), key=lambda x: x[1], reverse=True))
-    return sorted_importance
+    try:
+        # Get the final estimator from the pipeline
+        if hasattr(model, 'named_steps'):
+            if 'regressor' in model.named_steps:
+                estimator = model.named_steps['regressor']
+            elif 'classifier' in model.named_steps:
+                estimator = model.named_steps['classifier']
+            else:
+                return None
+        else:
+            estimator = model
+        
+        # Get feature importance
+        if hasattr(estimator, 'feature_importances_'):
+            importances = estimator.feature_importances_
+        else:
+            # For voting estimators, average the importance
+            if hasattr(estimator, 'estimators_'):
+                importances = []
+                for est in estimator.estimators_:
+                    if hasattr(est, 'feature_importances_'):
+                        importances.append(est.feature_importances_)
+                if importances:
+                    importances = np.mean(importances, axis=0)
+                else:
+                    return None
+            else:
+                return None
+        
+        # Map to selected features
+        if len(importances) == len(selected_features):
+            feature_importance = dict(zip(selected_features, importances))
+        else:
+            feature_importance = dict(zip(feature_columns[:len(importances)], importances))
+        
+        sorted_importance = dict(sorted(feature_importance.items(), key=lambda x: x[1], reverse=True))
+        return sorted_importance
+    except Exception as e:
+        logger.error(f"Error getting feature importance: {str(e)}")
+        return None
+    
+    
+import matplotlib.pyplot as plt
+def visualize_feature_importance():
+    importance = get_feature_importance()
+    if importance:
+        plt.bar(importance.keys(), importance.values())
+        plt.xticks(rotation=45)
+        plt.ylabel('Importance')
+        plt.title('Feature Importance')
+        plt.show()

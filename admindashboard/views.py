@@ -236,6 +236,7 @@ def upload_model(request):
             messages.error(request, f'Error uploading model: {str(e)}')
             return redirect('admin_dashboard')
         
+from ml_model.soil_moisture_prediction import load_model, train_model_with_db_data
 @login_required
 @role_required('admin')
 def upload_model_soil_moisture(request):
@@ -253,7 +254,7 @@ def upload_model_soil_moisture(request):
         
         try:
             # Load the uploaded model
-            success = load_uploaded_model(model_file)
+            success = load_model()
             if not success:
                 messages.error(request, 'Failed to load the uploaded model.')
                 return redirect('admin_dashboard')

@@ -52,6 +52,12 @@
                     Reports
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link d-flex align-items-center gap-3" href="#notifications">
+                    <i class="bi bi-bell fs-4"></i>
+                    Farmer Notifications
+                </a>
+            </li>
 
             <li class="nav-item mt-4 px-3"> 
                 <a href="{% url 'logout' %}" class="btn btn-outline-danger d-flex align-items-center justify-content-center gap-2">
@@ -423,6 +429,112 @@
         </section>
 
         
+        <!-- Farmer Notifications -->
+        <section id="notifications" class="content-section">
+            <h3>Send Notification to Farmer</h3>
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" action="{% url 'send_farmer_notification' %}">
+                        {% csrf_token %}
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="farmer" class="form-label">Select Farmer</label>
+                                <select class="form-select" id="farmer" name="farmer_id" required>
+                                    <option value="" selected disabled>Select a farm</option>
+                                    {% for farm in farmers %}
+                                    <option value="{{ farm.id }}">{{ farm.farmer.username }} - {{ farm.location }} ({{ farm.size }} acres)</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="notification_type" class="form-label">Notification Type</label>
+                                <select class="form-select" id="notification_type" name="notification_type" required>
+                                    <option value="alert">Moisture Alert</option>
+                                    <option value="advice">Irrigation Advice</option>
+                                    <option value="general">General Message</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="message" class="form-label">Message</label>
+                            <textarea class="form-control" id="message" name="message" rows="4" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="urgency" class="form-label">Urgency Level</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="urgency" id="low" value="low" checked>
+                                <label class="form-check-label" for="low">
+                                    Low (General Information)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="urgency" id="medium" value="medium">
+                                <label class="form-check-label" for="medium">
+                                    Medium (Important Notice)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="urgency" id="high" value="high">
+                                <label class="form-check-label" for="high">
+                                    High (Immediate Action Required)
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
+                            <i class="bi bi-send"></i>
+                            Send Notification
+                        </button>
+                    </form>
+                </div>
+            </div>
+        
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5>Recent Notifications Sent</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Farmer</th>
+                                    <th>Type</th>
+                                    <th>Message</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for notification in sent_notifications %}
+                                <tr>
+                                    <td>{{ notification.timestamp|date:"Y-m-d H:i" }}</td>
+                                    <td>{{ notification.farmer.username }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if notification.notification_type == 'alert' %}bg-danger
+                                            {% elif notification.notification_type == 'advice' %}bg-primary
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ notification.get_notification_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ notification.message|truncatechars:50 }}</td>
+                                    <td>
+                                        {% if notification.read %}
+                                        <span class="badge bg-success">Read</span>
+                                        {% else %}
+                                        <span class="badge bg-warning text-dark">Unread</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5">No notifications sent yet.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
     <!-- Bootstrap JS and Custom JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'JS/technician_scripts.js' %}"></script>
